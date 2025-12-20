@@ -1,0 +1,53 @@
+name: "Ketogo — Scout (backlog)"
+
+concurrency:
+  group: ketogo-scout
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install feedparser beautifulsoup4
+
+      - name: Run scout
+        run: python scripts/scout.py
+
+      - name: Commit backlog to bot branch
+        run: |
+          set -e
+          git config user.name "ketogo-bot"
+          git config user.email "bot@users.noreply.github.com"
+
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+          git checkout -B bot/backlog
+          git add data/candidates.json
+
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+
+          git commit -m "bot: update backlog"
+          git push -u origin bot/backlog --force-with-lease
