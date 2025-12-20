@@ -1,0 +1,14 @@
+{
+  "issue_title": "Ketogo \u2014 Backlog proposte",
+  "daily_new_limit": 20,
+  "feeds": [
+    {
+      "name": "Reddit - oddlyinteresting",
+      "url": "https://www.reddit.com/r/oddlyinteresting/.rss"
+    },
+    {
+      "name": "Bored Panda",
+      "url": "https://www.boredpanda.com/feed/"
+    }
+  ]
+}
