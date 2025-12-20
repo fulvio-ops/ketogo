@@ -7,7 +7,7 @@ concurrency:
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 6 * * *"
+    - cron: "0 6 * * *"   # ogni giorno alle 06:00 UTC (08:00 in Italia quando è ora legale)
 
 permissions:
   contents: write
@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # importante per pull --rebase
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -32,16 +34,39 @@ jobs:
       - name: Run scout
         run: python scripts/scout.py
 
-      - name: Commit backlog
+      - name: Commit backlog (robusto)
         run: |
+          set -e
+
           git config user.name "ketogo-bot"
           git config user.email "bot@users.noreply.github.com"
 
+          # Aggancia il branch al remoto (a volte checkout resta detached)
+          git checkout main
+          git branch --set-upstream-to=origin/main main || true
+
+          # Rebase iniziale (se fallisce, non bloccare)
           git pull --rebase origin main || true
 
+          # Commit solo se cambia qualcosa
           git add data/candidates.json
-          git diff --cached --quiet || git commit -m "update ketogo backlog"
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica su data/candidates.json, niente commit."
+            exit 0
+          fi
 
-          git push
+          git commit -m "update ketogo backlog"
 
+          # Push con retry + rebase (anti non-fast-forward)
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main || true
+            if git push; then
+              echo "Push OK."
+              exit 0
+            fi
+            echo "Push fallito, retry $i..."
+            sleep 3
+          done
 
+          echo "Push fallito dopo 5 tentativi."
+          exit 1
