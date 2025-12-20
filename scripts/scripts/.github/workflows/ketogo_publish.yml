@@ -1,0 +1,77 @@
+name: "Ketogo — Publish (da backlog)"
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.comment.body, 'PUBBLICA')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download Issue body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const issue = context.payload.issue;
+            fs.writeFileSync('ISSUE_BODY.md', issue.body || '', 'utf8');
+
+      - name: Publish selected items
+        env:
+          ISSUE_BODY_PATH: ISSUE_BODY.md
+        run: |
+          python scripts/publish_from_issue.py
+
+      - name: Commit updates
+        run: |
+          git config user.name "ketogo-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/numeri.json data/candidates.json
+          git diff --cached --quiet || git commit -m "publish: nuovi contenuti Ketogo"
+          git push
+
+      - name: Refresh Issue body
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const { execSync } = require('child_process');
+            const admin = JSON.parse(fs.readFileSync('data/ketogo_admin.json','utf8'));
+            const issueTitle = admin.issue_title || 'Ketogo — Backlog proposte';
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const issue = issues.find(i => i.title === issueTitle);
+            if (!issue) {
+              core.warning('Backlog issue not found; skipping update.');
+              return;
+            }
+
+            const body = execSync('python scripts/render_issue.py', { encoding: 'utf8' });
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body
+            });
