@@ -7,7 +7,7 @@ concurrency:
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 6 * * *"   # ogni giorno alle 06:00 UTC (08:00 in Italia quando è ora legale)
+    - cron: "0 6 * * *"
 
 permissions:
   contents: write
@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository (main)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # importante per pull --rebase
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,39 +34,31 @@ jobs:
       - name: Run scout
         run: python scripts/scout.py
 
-      - name: Commit backlog (robusto)
+      - name: Commit backlog to bot branch (no conflicts)
+        env:
+          BOT_BRANCH: bot/backlog
         run: |
           set -e
 
           git config user.name "ketogo-bot"
           git config user.email "bot@users.noreply.github.com"
 
-          # Aggancia il branch al remoto (a volte checkout resta detached)
+          # assicura main aggiornata
+          git fetch origin main
           git checkout main
-          git branch --set-upstream-to=origin/main main || true
+          git reset --hard origin/main
 
-          # Rebase iniziale (se fallisce, non bloccare)
-          git pull --rebase origin main || true
+          # crea/aggiorna branch del bot basato su main
+          git checkout -B "$BOT_BRANCH"
 
-          # Commit solo se cambia qualcosa
+          # applica modifiche
           git add data/candidates.json
           if git diff --cached --quiet; then
             echo "Nessuna modifica su data/candidates.json, niente commit."
             exit 0
           fi
 
-          git commit -m "update ketogo backlog"
+          git commit -m "bot: update ketogo backlog"
 
-          # Push con retry + rebase (anti non-fast-forward)
-          for i in 1 2 3 4 5; do
-            git pull --rebase origin main || true
-            if git push; then
-              echo "Push OK."
-              exit 0
-            fi
-            echo "Push fallito, retry $i..."
-            sleep 3
-          done
-
-          echo "Push fallito dopo 5 tentativi."
-          exit 1
+          # push SOLO sul branch bot (non su main)
+          git push -u origin "$BOT_BRANCH" --force-with-lease
