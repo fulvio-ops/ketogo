@@ -1,5 +1,9 @@
 name: "Ketogo — Scout (backlog)"
 
+concurrency:
+  group: ketogo-scout
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   schedule:
@@ -33,11 +37,11 @@ jobs:
           git config user.name "ketogo-bot"
           git config user.email "bot@users.noreply.github.com"
 
+          git pull --rebase origin main || true
+
           git add data/candidates.json
           git diff --cached --quiet || git commit -m "update ketogo backlog"
 
-          # 🔧 Fix: allinea prima il branch locale al remoto
-          git pull --rebase origin main
-
           git push
+
 
