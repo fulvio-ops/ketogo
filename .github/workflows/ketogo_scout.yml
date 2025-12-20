@@ -1,5 +1,3 @@
-# VERSIONE BOT-BRANCH 2025-12-20
-
 name: "Ketogo — Scout (backlog)"
 
 concurrency:
@@ -45,7 +43,7 @@ jobs:
           git config user.name "ketogo-bot"
           git config user.email "bot@users.noreply.github.com"
 
-          # assicura main aggiornata
+          # aggiorna main dal remoto
           git fetch origin main
           git checkout main
           git reset --hard origin/main
@@ -53,7 +51,7 @@ jobs:
           # crea/aggiorna branch del bot basato su main
           git checkout -B "$BOT_BRANCH"
 
-          # applica modifiche
+          # commit se ci sono modifiche
           git add data/candidates.json
           if git diff --cached --quiet; then
             echo "Nessuna modifica su data/candidates.json, niente commit."
@@ -62,5 +60,5 @@ jobs:
 
           git commit -m "bot: update ketogo backlog"
 
-          # push SOLO sul branch bot (non su main)
+          # push SOLO sul branch bot
           git push -u origin "$BOT_BRANCH" --force-with-lease
