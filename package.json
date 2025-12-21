@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
-    "build": "node scripts/build-posts.mjs && astro build",
+    "build": "node scripts/build-posts.mjs && node scripts/pick-featured.mjs && astro build"
     "preview": "astro preview"
   },
   "dependencies": {
