@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SITE } from "../src/lib/config.ts";
+import { SITE } from "../src/lib/config.js";
 
 const UA = process.env.REDDIT_UA || "ketogo/1.0 (static build)";
 const now = Date.now();
