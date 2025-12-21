@@ -1,5 +1,5 @@
 ---
-import { SITE } from "../lib/config";
+import { SITE } from "../lib/config.js";
 const d = new Date();
 const week = Math.ceil(
   ((+d - +new Date(d.getFullYear(), 0, 1)) / 86400000 + new Date(d.getFullYear(), 0, 1).getDay() + 1) / 7
