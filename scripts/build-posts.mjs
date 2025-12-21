@@ -1,6 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SITE } from "../src/lib/config.js";
+const SITE = {
+  title: "KETOGO",
+  subtitle: "Weekly visual selection",
+  subreddits: ["Damnthatsinteresting", "oddlysatisfying", "InternetIsBeautiful", "DesignPorn"],
+  limit: 22,
+  maxAgeDays: 14
+};
 
 const UA = process.env.REDDIT_UA || "ketogo/1.0 (static build)";
 const now = Date.now();
