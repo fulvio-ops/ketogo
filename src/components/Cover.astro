@@ -1,0 +1,35 @@
+---
+import { SITE } from "../lib/config";
+const d = new Date();
+const week = Math.ceil(
+  ((+d - +new Date(d.getFullYear(), 0, 1)) / 86400000 + new Date(d.getFullYear(), 0, 1).getDay() + 1) / 7
+);
+---
+<section class="min-h-[92vh] flex flex-col justify-center px-5 pt-10 pb-14">
+  <div class="max-w-xl">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="h-2 w-2 rounded-full bg-[rgb(var(--accent))]"></div>
+      <div class="h-px flex-1 bg-[rgb(var(--stroke))]"></div>
+    </div>
+
+    <h1 class="font-display text-5xl tracking-tight leading-[1.02]">
+      {SITE.title}
+    </h1>
+
+    <p class="mt-3 text-[15px] text-[rgb(var(--muted))]">
+      {SITE.subtitle}
+    </p>
+
+    <div class="mt-10 inline-flex items-baseline gap-3">
+      <span class="text-[rgb(var(--muted))] text-xs uppercase tracking-[0.28em]">Issue</span>
+      <span class="text-2xl font-display text-[rgb(var(--fg))]">
+        {d.getFullYear()} · W{String(week).padStart(2, "0")}
+      </span>
+    </div>
+
+    <div class="mt-10">
+      <div class="h-px w-full bg-[rgb(var(--stroke))]"></div>
+      <p class="mt-4 text-sm text-[rgb(var(--muted))]">Scroll to enter.</p>
+    </div>
+  </div>
+</section>
