@@ -27,7 +27,7 @@ jobs:
           node-version: 20
 
       - name: Install
-        run: npm Install
+        run: npm install
 
       - name: Build
         env:
