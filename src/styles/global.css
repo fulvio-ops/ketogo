@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Magazine dark: caldo e premium (non grigio-freddo) */
+:root{
+  --bg: 12 12 12;
+  --fg: 245 242 235;
+  --muted: 170 166 158;
+  --card: 18 18 18;
+  --stroke: 45 45 45;
+  --accent: 200 170 120; /* oro editoriale */
+}
+
+html, body { height: 100%; }
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: ui-sans-serif, system-ui;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection{
+  background: rgba(var(--accent), .35);
+}
+
+a, button { -webkit-tap-highlight-color: rgba(0,0,0,0); }
