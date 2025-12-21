@@ -1,28 +1,40 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Magazine dark: caldo e premium (non grigio-freddo) */
 :root{
   --bg: 12 12 12;
   --fg: 245 242 235;
   --muted: 170 166 158;
   --card: 18 18 18;
   --stroke: 45 45 45;
-  --accent: 200 170 120; /* oro editoriale */
+  --accent: 200 170 120;
 }
 
-html, body { height: 100%; }
-body {
+body{
   background: rgb(var(--bg));
   color: rgb(var(--fg));
-  font-family: ui-sans-serif, system-ui;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
-::selection{
-  background: rgba(var(--accent), .35);
+.k-glass{
+  background: rgba(18,18,18,.72);
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  backdrop-filter: blur(10px);
 }
 
-a, button { -webkit-tap-highlight-color: rgba(0,0,0,0); }
+.k-border{
+  position: relative;
+}
+.k-border:before{
+  content:"";
+  position:absolute; inset:-1px;
+  border-radius: 24px;
+  padding:1px;
+  background: linear-gradient(135deg, rgba(200,170,120,.35), rgba(140,80,255,.22), rgba(80,180,255,.18));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events:none;
+}
