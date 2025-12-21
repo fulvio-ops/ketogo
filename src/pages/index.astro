@@ -5,6 +5,7 @@ import Cover from "../components/Cover.astro";
 import HeroCard from "../components/HeroCard.astro";
 import PostCard from "../components/PostCard.astro";
 import Footer from "../components/Footer.astro";
+import Background from "../components/Background.astro";
 
 import data from "../data/posts.json";
 
@@ -24,6 +25,7 @@ const pattern = ["medium","small","small","medium","small","small","small"];
     <meta name="description" content="Weekly visual selection." />
   </head>
   <body class="overflow-x-hidden">
+    <Background />
     <main>
       <Cover />
 
