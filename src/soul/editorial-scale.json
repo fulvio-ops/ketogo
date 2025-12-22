@@ -1,0 +1,23 @@
+{
+  "immutable": true,
+  "levels": {
+    "0": { "name": "neutro", "allowed": false },
+    "1": { "name": "osservativo", "allowed": false },
+    "2": { "name": "ironico", "allowed": "short_only" },
+    "3": { "name": "ironico_colto", "allowed": true },
+    "4": { "name": "disturbante_leggero", "allowed": true }
+  },
+  "rules": {
+    "max_words": 7,
+    "no_explanations": true,
+    "no_moralizing": true,
+    "no_sales": true,
+    "no_punching_down": true,
+    "companionship_first": true,
+    "viral_bias": true
+  },
+  "featured_constraints": {
+    "min_level4_in_featured": 1,
+    "max_level2_ratio": 0.6
+  }
+}

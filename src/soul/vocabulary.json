@@ -4,51 +4,63 @@
   "allowed": [
     {
       "en": "This exists.",
-      "it": "Questo esiste."
+      "it": "Questo esiste.",
+      "level": 3
     },
     {
       "en": "Progress update.",
-      "it": "Aggiornamento progresso."
+      "it": "Aggiornamento progresso.",
+      "level": 2
     },
     {
       "en": "No one asked for this.",
-      "it": "Non l’ha chiesto nessuno."
+      "it": "Non l’ha chiesto nessuno.",
+      "level": 3
     },
     {
       "en": "And yet, here we are.",
-      "it": "Eppure eccoci qui."
+      "it": "Eppure eccoci qui.",
+      "level": 3
     },
     {
       "en": "Humanity is trying.",
-      "it": "L’umanità ci sta provando."
+      "it": "L’umanità ci sta provando.",
+      "level": 3
     },
     {
       "en": "Someone approved this.",
-      "it": "Qualcuno l’ha approvato."
+      "it": "Qualcuno l’ha approvato.",
+      "level": 3
     },
     {
       "en": "Nature remains undefeated.",
-      "it": "La natura vince sempre."
+      "it": "La natura vince sempre.",
+      "level": 3
     },
     {
       "en": "Probably fine.",
-      "it": "Probabilmente va bene."
+      "it": "Probabilmente va bene.",
+      "level": 2
     },
     {
       "en": "This didn’t need to happen.",
-      "it": "Non doveva succedere."
+      "it": "Non doveva succedere.",
+      "level": 4
     },
     {
       "en": "The system is working as intended.",
-      "it": "Il sistema funziona come previsto."
+      "it": "Il sistema funziona come previsto.",
+      "level": 4
     },
     {
       "en": "This will not be the last time.",
-      "it": "Non sarà l’ultima volta."
+      "it": "Non sarà l’ultima volta.",
+      "level": 4
     },
     {
       "en": "Someone thought this through.",
-      "it": "Qualcuno ci ha ragionato."
+      "it": "Qualcuno ci ha ragionato.",
+      "level": 3
     }
   ],
   "forbidden_phrases": [
