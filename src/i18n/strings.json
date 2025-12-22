@@ -1,0 +1,22 @@
+{
+  "en": {
+    "brand": "KETOGO",
+    "tagline": "Weekly visual selection",
+    "scroll": "Scroll to enter.",
+    "articles": "Articles",
+    "oddities": "Bizarre stuff for sale",
+    "language": "Language",
+    "issue": "Issue",
+    "generated": "Generated"
+  },
+  "it": {
+    "brand": "KETOGO",
+    "tagline": "Selezione visiva settimanale",
+    "scroll": "Scorri per entrare.",
+    "articles": "Articoli",
+    "oddities": "Cose bizzarre in vendita",
+    "language": "Lingua",
+    "issue": "Uscita",
+    "generated": "Generato"
+  }
+}

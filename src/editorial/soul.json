@@ -1,0 +1,94 @@
+{
+  "version": "1.0.0",
+  "immutable": true,
+  "categories": [
+    "NATURE",
+    "HUMAN_BEHAVIOR",
+    "TECH_PROGRESS",
+    "OBJECT",
+    "SYSTEM_FAILURE",
+    "INEVITABILITY"
+  ],
+  "vocabulary": {
+    "NATURE": [
+      {
+        "en": "Nature remains undefeated.",
+        "it": "La natura vince sempre."
+      },
+      {
+        "en": "Probably fine.",
+        "it": "Probabilmente va bene."
+      }
+    ],
+    "HUMAN_BEHAVIOR": [
+      {
+        "en": "Someone approved this.",
+        "it": "Qualcuno l’ha approvato."
+      },
+      {
+        "en": "Humanity is trying.",
+        "it": "L’umanità ci sta provando."
+      },
+      {
+        "en": "And yet, here we are.",
+        "it": "Eppure eccoci qui."
+      }
+    ],
+    "TECH_PROGRESS": [
+      {
+        "en": "Progress update.",
+        "it": "Aggiornamento progresso."
+      },
+      {
+        "en": "No one asked for this.",
+        "it": "Non l’ha chiesto nessuno."
+      },
+      {
+        "en": "This felt like a good idea at the time.",
+        "it": "Sembrava una buona idea, allora."
+      }
+    ],
+    "OBJECT": [
+      {
+        "en": "This exists.",
+        "it": "Questo esiste."
+      },
+      {
+        "en": "Someone thought this through.",
+        "it": "Qualcuno ci ha ragionato."
+      },
+      {
+        "en": "No one asked for this.",
+        "it": "Non l’ha chiesto nessuno."
+      }
+    ],
+    "SYSTEM_FAILURE": [
+      {
+        "en": "The system is working as intended.",
+        "it": "Il sistema funziona come previsto."
+      },
+      {
+        "en": "This didn’t need to happen.",
+        "it": "Non doveva succedere."
+      }
+    ],
+    "INEVITABILITY": [
+      {
+        "en": "And yet, here we are.",
+        "it": "Eppure eccoci qui."
+      },
+      {
+        "en": "This will not be the last time.",
+        "it": "Non sarà l’ultima volta."
+      }
+    ]
+  },
+  "rules": {
+    "one_judgment_only": true,
+    "no_variations": true,
+    "no_emojis": true,
+    "no_explanations": true,
+    "reject_if_ambiguous": true,
+    "reject_if_discomforting": true
+  }
+}
