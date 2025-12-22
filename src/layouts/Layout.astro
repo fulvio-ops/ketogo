@@ -1,0 +1,20 @@
+---
+const {
+  title = "Ketogo",
+  description = "A weekly visual selection.",
+  lang = "en"
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang={lang} class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-full bg-[rgb(var(--bg))] text-[rgb(var(--fg))]">
+    <slot />
+  </body>
+</html>
