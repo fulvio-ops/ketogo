@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { XMLParser } from "fast-xml-parser";
+import { approve } from "./editorial.mjs";
 
-// Inline config (avoids TS import issues)
 const SITE = {
   title: "KETOGO",
   subtitle: "Weekly visual selection",
@@ -26,10 +26,7 @@ function daysAgo(d) {
   const ms = Date.now() - d.getTime();
   return ms / (1000 * 60 * 60 * 24);
 }
-
-function clean(str) {
-  return (str || "").toString().trim();
-}
+function clean(str) { return (str || "").toString().trim(); }
 
 function uniqBy(arr, keyFn) {
   const seen = new Set();
@@ -44,23 +41,10 @@ function uniqBy(arr, keyFn) {
 }
 
 async function fetchJson(url) {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      "Accept": "application/json,text/plain,*/*"
-    }
-  });
-  return res;
+  return fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json,text/plain,*/*" } });
 }
-
 async function fetchRss(url) {
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": UA,
-      "Accept": "application/rss+xml,application/xml,text/xml,*/*"
-    }
-  });
-  return res;
+  return fetch(url, { headers: { "User-Agent": UA, "Accept": "application/rss+xml,application/xml,text/xml,*/*" } });
 }
 
 async function getFromRedditJson(sub) {
@@ -88,7 +72,6 @@ async function getFromRedditJson(sub) {
 }
 
 async function getFromRedditRss(sub) {
-  // RSS is often less restricted than JSON endpoints
   const url = `https://www.reddit.com/r/${sub}/top/.rss?t=week`;
   const res = await fetchRss(url);
   if (!res.ok) throw new Error(`Reddit RSS failed ${sub}: ${res.status}`);
@@ -104,7 +87,6 @@ async function getFromRedditRss(sub) {
     const author = clean(e.author?.name);
     const id = clean(e.id) || link;
 
-    // RSS link points to reddit comments, try to extract outbound link if present in content
     const content = clean(e.content?.["#text"] || e.content);
     let outbound = null;
     const m = content.match(/href="(https?:\/\/[^"]+)"/i);
@@ -130,7 +112,6 @@ async function fetchSubreddit(sub) {
   try {
     return await getFromRedditJson(sub);
   } catch (e) {
-    // If JSON is blocked (403), try RSS
     const msg = String(e);
     if (msg.includes(": 403") || msg.includes(" 403")) {
       console.error(`⚠️ JSON blocked for ${sub} (403). Trying RSS...`);
@@ -152,7 +133,6 @@ async function main() {
     await new Promise((r) => setTimeout(r, 350));
   }
 
-  // filter recency if we have dates
   const filtered = all.filter((p) => {
     if (!p.createdUtc) return true;
     const d = new Date(p.createdUtc);
@@ -160,19 +140,21 @@ async function main() {
     return daysAgo(d) <= SITE.maxAgeDays;
   });
 
-  const posts = uniqBy(filtered, (p) => p.url || p.permalink || p.id).slice(0, SITE.limit);
+  const deduped = uniqBy(filtered, (p) => p.url || p.permalink || p.id);
 
-  const out = {
-    generatedAt: new Date().toISOString(),
-    subreddits: SITE.subreddits,
-    posts
-  };
+  const approved = deduped.map(approve).filter(Boolean).slice(0, SITE.limit);
+
+  if (approved.length < 6) {
+    throw new Error(`Editorial threshold not met (approved=${approved.length}).`);
+  }
+
+  const out = { generatedAt: new Date().toISOString(), subreddits: SITE.subreddits, posts: approved };
 
   const outDir = path.join(process.cwd(), "src", "data");
   await fs.mkdir(outDir, { recursive: true });
   await fs.writeFile(path.join(outDir, "posts.json"), JSON.stringify(out, null, 2), "utf8");
 
-  console.log(`✅ Built posts.json with ${posts.length} items`);
+  console.log(`✅ Built posts.json with ${approved.length} approved items`);
 }
 
 main().catch((e) => {
