@@ -43,8 +43,10 @@ async function main(){
   const odditiesPool=posts.filter(p=>p?.subreddit && SHOP_SUBS.has(p.subreddit) && (!hero || p.id!==hero.id));
 
   const articles = pickN(articlesPool, PICK, rng);
-  const pickedOdd = pickN(odditiesPool, PICK, rng);
 
+const gatedOddities = filterGadgets(odditiesPool);
+const pickedOdd = pickN(gatedOddities, PICK, rng);
+  
   const need = PICK - pickedOdd.length;
   const fill = need>0 ? pickN(posts.filter(p=>!articles.some(a=>a.id===p.id)&&!pickedOdd.some(o=>o.id===p.id)&&(!hero||p.id!==hero.id)), need, rng) : [];
 
