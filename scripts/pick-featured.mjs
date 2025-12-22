@@ -1,12 +1,20 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { score } from "./editorial.mjs";
+import vocab from "../src/soul/vocabulary.json" assert { type: "json" };
+import { validateFeatured } from "./editorial-gate.mjs";
 
 const SOURCE = "src/data/posts.json";
 const OUT = "src/data/featured.json";
 const PICK = 4;
 
 const SHOP_SUBS = new Set(["ShutUpAndTakeMyMoney","gadgets","BuyItForLife"]);
+
+const allowedByEn = new Map(vocab.allowed.map(v => [v.en, v]));
+function levelOf(post){
+  const key = post?.judgment?.en;
+  return allowedByEn.get(key)?.level ?? 0;
+}
 
 function mulberry32(a){return function(){let t=(a+=0x6D2B79F5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return((t^(t>>>14))>>>0)/4294967296;}}
 function isoWeekSeed(d=new Date()){
@@ -39,7 +47,23 @@ async function main(){
   const need = PICK - pickedOdd.length;
   const fill = need>0 ? pickN(posts.filter(p=>!articles.some(a=>a.id===p.id)&&!pickedOdd.some(o=>o.id===p.id)&&(!hero||p.id!==hero.id)), need, rng) : [];
 
-  const featured={ generatedAt:new Date().toISOString(), seed, hero, articles, oddities:[...pickedOdd, ...fill] };
+  let featured={ generatedAt:new Date().toISOString(), seed, hero, articles, oddities:[...pickedOdd, ...fill] };
+
+  // Editorial balance: if we can, ensure at least one level-4 line in featured (to avoid "piatto")
+  const current = [featured.hero, ...featured.articles, ...featured.oddities].filter(Boolean);
+  const l4 = current.filter(p => levelOf(p) >= 4).length;
+  if (l4 < 1) {
+    const candidate = posts
+      .filter(p => !current.some(x => x.id === p.id))
+      .filter(p => levelOf(p) >= 4)[0];
+    if (candidate) {
+      // swap last oddity with candidate
+      featured.oddities = [...featured.oddities.slice(0, Math.max(0, featured.oddities.length - 1)), candidate];
+    }
+  }
+
+  // Hard gate (throws on violations)
+  validateFeatured(featured);
 
   await fs.mkdir(path.join(process.cwd(),"src","data"),{recursive:true});
   await fs.writeFile(path.join(process.cwd(),OUT),JSON.stringify(featured,null,2),"utf8");
