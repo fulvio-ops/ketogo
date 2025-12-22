@@ -1,0 +1,20 @@
+{
+  "price_rules": {
+    "core_range": {
+      "min": 5,
+      "max": 15
+    },
+    "exception_max": 25,
+    "exception_ratio": 0.25
+  },
+  "shareability": {
+    "min_score": 7,
+    "factors": [
+      "immediate_visual",
+      "social_identity",
+      "low_risk",
+      "storytelling",
+      "controlled_absurdity"
+    ]
+  }
+}
