@@ -5,7 +5,8 @@ const SOURCE = "src/data/posts.json";
 const OUT = "src/data/featured.json";
 const PICK = 4;
 
-// RNG deterministico
+const SHOP_SUBS = new Set(["ShutUpAndTakeMyMoney", "gadgets", "BuyItForLife"]);
+
 function mulberry32(a) {
   return function () {
     let t = (a += 0x6D2B79F5);
@@ -33,47 +34,37 @@ function shuffle(arr, rng) {
   return a;
 }
 
-function isShop(post) {
-  const u = (post?.url || "").toLowerCase();
-  const d = (post?.domain || "").toLowerCase();
-
-  const shopDomains = [
-    "amazon.", "amzn.", "ebay.", "etsy.", "aliexpress.", "alibaba.",
-    "temu.", "shopify.", "store.", "walmart.", "bestbuy.", "ikea.",
-    "subito.", "vinted.", "zalando.", "unieuro.", "mediaworld.", "boulanger."
-  ];
-
-  // segnali “shop”
-  if (shopDomains.some(x => d.includes(x) || u.includes(x))) return true;
-  if (u.includes("/dp/") || u.includes("/gp/") || u.includes("product") || u.includes("cart")) return true;
-  return false;
-}
-
 async function main() {
   const raw = await fs.readFile(path.join(process.cwd(), SOURCE), "utf8");
   const data = JSON.parse(raw);
-
   const posts = Array.isArray(data?.posts) ? data.posts : [];
+
   const rng = mulberry32(isoWeekSeed());
 
-  const shop = posts.filter(isShop);
-  const nonShop = posts.filter(p => !isShop(p));
+  // “Articoli” = NON shop-subs
+  const articlesPool = posts.filter(p => p?.subreddit && !SHOP_SUBS.has(p.subreddit));
 
-  const pickedShop = shuffle(shop, rng).slice(0, PICK);
+  // “Oggetti” = shop-subs
+  const odditiesPool = posts.filter(p => p?.subreddit && SHOP_SUBS.has(p.subreddit));
 
-  // se non bastano “shop”, riempi con altri post (meglio non rimanere vuoti)
-  const needMore = PICK - pickedShop.length;
-  const pickedArticles = shuffle(nonShop, rng).slice(0, PICK);
+  const articles = shuffle(articlesPool, rng).slice(0, PICK);
 
-  const shopFill = needMore > 0
-    ? shuffle(nonShop.filter(p => !pickedArticles.find(a => a.id === p.id)), rng).slice(0, needMore)
+  // se per qualche motivo ne arrivano pochi, riempi con altri post
+  const pickedOdd = shuffle(odditiesPool, rng).slice(0, PICK);
+  const need = PICK - pickedOdd.length;
+
+  const odditiesFill = need > 0
+    ? shuffle(
+        posts.filter(p => !articles.find(a => a.id === p.id) && !pickedOdd.find(o => o.id === p.id)),
+        rng
+      ).slice(0, need)
     : [];
 
   const featured = {
     generatedAt: new Date().toISOString(),
     seed: isoWeekSeed(),
-    articles: pickedArticles,
-    oddities: [...pickedShop, ...shopFill] // 4 elementi garantiti
+    articles,
+    oddities: [...pickedOdd, ...odditiesFill]
   };
 
   await fs.mkdir(path.join(process.cwd(), "src", "data"), { recursive: true });
