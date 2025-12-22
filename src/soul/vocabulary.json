@@ -1,0 +1,63 @@
+{
+  "immutable": true,
+  "max_words": 7,
+  "allowed": [
+    {
+      "en": "This exists.",
+      "it": "Questo esiste."
+    },
+    {
+      "en": "Progress update.",
+      "it": "Aggiornamento progresso."
+    },
+    {
+      "en": "No one asked for this.",
+      "it": "Non l’ha chiesto nessuno."
+    },
+    {
+      "en": "And yet, here we are.",
+      "it": "Eppure eccoci qui."
+    },
+    {
+      "en": "Humanity is trying.",
+      "it": "L’umanità ci sta provando."
+    },
+    {
+      "en": "Someone approved this.",
+      "it": "Qualcuno l’ha approvato."
+    },
+    {
+      "en": "Nature remains undefeated.",
+      "it": "La natura vince sempre."
+    },
+    {
+      "en": "Probably fine.",
+      "it": "Probabilmente va bene."
+    },
+    {
+      "en": "This didn’t need to happen.",
+      "it": "Non doveva succedere."
+    },
+    {
+      "en": "The system is working as intended.",
+      "it": "Il sistema funziona come previsto."
+    },
+    {
+      "en": "This will not be the last time.",
+      "it": "Non sarà l’ultima volta."
+    },
+    {
+      "en": "Someone thought this through.",
+      "it": "Qualcuno ci ha ragionato."
+    }
+  ],
+  "forbidden_phrases": [
+    "È interessante perché",
+    "Un’incredibile scoperta",
+    "Questo dimostra che",
+    "Fa riflettere su",
+    "Ci insegna che",
+    "Un must-have",
+    "Perfetto per chi ama"
+  ]
+}

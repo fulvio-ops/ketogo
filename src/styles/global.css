@@ -10,13 +10,13 @@
   --accent: 200 170 120;
 }
 body{ background: rgb(var(--bg)); color: rgb(var(--fg)); }
-
-.k-glass{ background: rgba(18,18,18,.72); border: 1px solid rgba(255,255,255,.08); box-shadow: 0 10px 30px rgba(0,0,0,.45); backdrop-filter: blur(10px); }
+.k-glass{ background: rgba(18,18,18,.74); border: 1px solid rgba(255,255,255,.08); box-shadow: 0 16px 40px rgba(0,0,0,.55); backdrop-filter: blur(10px); }
 .k-border{ position: relative; }
-.k-border:before{
-  content:""; position:absolute; inset:-1px; border-radius: 24px; padding:1px;
-  background: linear-gradient(135deg, rgba(200,170,120,.35), rgba(140,80,255,.22), rgba(80,180,255,.18));
+.k-border:before{ content:""; position:absolute; inset:-1px; border-radius: 24px; padding:1px;
+  background: linear-gradient(135deg, rgba(200,170,120,.36), rgba(120,90,255,.18), rgba(80,180,255,.14));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor; mask-composite: exclude;
-  pointer-events:none;
-}
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events:none; }
+.k-label{ font-size: 10px; text-transform: uppercase; letter-spacing: .28em; color: rgba(255,255,255,.5); }
+.k-title{ letter-spacing: -0.02em; }
+.k-judgment{ color: rgba(255,255,255,.84); }
+.k-meta{ font-size: 11px; color: rgba(255,255,255,.38); }

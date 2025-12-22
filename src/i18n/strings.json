@@ -7,7 +7,9 @@
     "oddities": "Bizarre stuff for sale",
     "language": "Language",
     "issue": "Issue",
-    "generated": "Generated"
+    "generated": "Generated",
+    "editorial": "This week",
+    "editorial_hint": "Small companionship, zero explanations."
   },
   "it": {
     "brand": "KETOGO",
@@ -17,6 +19,8 @@
     "oddities": "Cose bizzarre in vendita",
     "language": "Lingua",
     "issue": "Uscita",
-    "generated": "Generato"
+    "generated": "Generato",
+    "editorial": "Questa settimana",
+    "editorial_hint": "Compagnia piccola, zero spiegazioni."
   }
 }

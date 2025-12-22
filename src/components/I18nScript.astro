@@ -3,7 +3,7 @@ import strings from "../i18n/strings.json";
 const defaultLang = "en";
 ---
 <script>
-  const STRINGS = {"en": {"brand": "KETOGO", "tagline": "Weekly visual selection", "scroll": "Scroll to enter.", "articles": "Articles", "oddities": "Bizarre stuff for sale", "language": "Language", "issue": "Issue", "generated": "Generated"}, "it": {"brand": "KETOGO", "tagline": "Selezione visiva settimanale", "scroll": "Scorri per entrare.", "articles": "Articoli", "oddities": "Cose bizzarre in vendita", "language": "Lingua", "issue": "Uscita", "generated": "Generato"}};
+  const STRINGS = {"en": {"brand": "KETOGO", "tagline": "Weekly visual selection", "scroll": "Scroll to enter.", "articles": "Articles", "oddities": "Bizarre stuff for sale", "language": "Language", "issue": "Issue", "generated": "Generated", "editorial": "This week", "editorial_hint": "Small companionship, zero explanations."}, "it": {"brand": "KETOGO", "tagline": "Selezione visiva settimanale", "scroll": "Scorri per entrare.", "articles": "Articoli", "oddities": "Cose bizzarre in vendita", "language": "Lingua", "issue": "Uscita", "generated": "Generato", "editorial": "Questa settimana", "editorial_hint": "Compagnia piccola, zero spiegazioni."}};
   const KEY = "ketogo_lang";
   const supported = new Set(["en","it"]);
   function infer(){
@@ -11,15 +11,15 @@ const defaultLang = "en";
     return supported.has(nav) ? nav : "en";
   }
   function get(){ return localStorage.getItem(KEY) || infer(); }
-  function apply(lang){ 
+  function apply(lang){
     document.documentElement.dataset.lang = lang;
     const dict = STRINGS[lang] || STRINGS["en"];
     document.querySelectorAll("[data-i18n]").forEach(el => {
       const k = el.getAttribute("data-i18n");
       if(dict && dict[k]) el.textContent = dict[k];
     });
-    document.querySelectorAll("[data-judgment-en]").forEach(el => el.classList.toggle("hidden", lang==="it"));
-    document.querySelectorAll("[data-judgment-it]").forEach(el => el.classList.toggle("hidden", lang!=="it"));
+    document.querySelectorAll("[data-en]").forEach(el => el.classList.toggle("hidden", lang==="it"));
+    document.querySelectorAll("[data-it]").forEach(el => el.classList.toggle("hidden", lang!=="it"));
   }
   function set(lang){ if(!supported.has(lang)) return; localStorage.setItem(KEY, lang); apply(lang); }
   window.ketogo = window.ketogo || {};

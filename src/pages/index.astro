@@ -2,47 +2,56 @@
 import Layout from "../layouts/Layout.astro";
 import LanguageToggle from "../components/LanguageToggle.astro";
 import PostCard from "../components/PostCard.astro";
+import EditorialCard from "../components/EditorialCard.astro";
 import featured from "../data/featured.json";
+import editorial from "../data/editorial.json";
 
 const issue = new Date(featured.generatedAt || Date.now()).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 ---
-
 <Layout title="KETOGO">
   <main class="overflow-x-hidden">
     <section class="min-h-[72vh] flex items-center justify-center px-6 pt-10 pb-14">
       <div class="max-w-xl text-center">
         <div class="flex items-center justify-center gap-3 mb-6">
-          <span class="text-[10px] uppercase tracking-[0.28em] text-white/50" data-i18n="language">Language</span>
+          <span class="k-label" data-i18n="language">Language</span>
           <LanguageToggle />
         </div>
-
-        <h1 class="text-5xl sm:text-6xl tracking-tight">
-          <span data-i18n="brand">KETOGO</span>
-        </h1>
-
+        <h1 class="text-5xl sm:text-6xl tracking-tight"><span data-i18n="brand">KETOGO</span></h1>
         <p class="mt-5 text-sm text-white/70" data-i18n="tagline">Weekly visual selection</p>
-
         <p class="mt-8 text-xs uppercase tracking-[0.28em] text-white/45">
           <span data-i18n="issue">Issue</span> · {issue}
         </p>
-
         <p class="mt-10 text-sm text-white/55" data-i18n="scroll">Scroll to enter.</p>
       </div>
     </section>
 
     <section class="pb-10">
+      <EditorialCard note={editorial.note} />
+    </section>
+
+    {featured.hero ? (
+      <section class="pb-10">
+        <div class="px-5 pb-4">
+          <div class="flex items-center gap-3">
+            <div class="h-2 w-2 rounded-full bg-[rgb(var(--accent))]"></div>
+            <div class="k-label">featured</div>
+            <div class="h-px flex-1 bg-white/10"></div>
+          </div>
+        </div>
+        <PostCard post={featured.hero} emphasis={true} />
+      </section>
+    ) : null}
+
+    <section class="pb-10">
       <div class="px-5 pb-4">
         <div class="flex items-center gap-3">
           <div class="h-2 w-2 rounded-full bg-[rgb(var(--accent))]"></div>
-          <h2 class="text-xs uppercase tracking-[0.28em] text-white/60" data-i18n="articles">Articles</h2>
+          <h2 class="k-label" data-i18n="articles">Articles</h2>
           <div class="h-px flex-1 bg-white/10"></div>
         </div>
       </div>
-
       <div class="flex flex-col gap-4">
-        {featured.articles.map((p) => (
-          <PostCard post={p} />
-        ))}
+        {featured.articles.map((p) => (<PostCard post={p} />))}
       </div>
     </section>
 
@@ -50,17 +59,13 @@ const issue = new Date(featured.generatedAt || Date.now()).toLocaleDateString("e
       <div class="px-5 pb-4">
         <div class="flex items-center gap-3">
           <div class="h-2 w-2 rounded-full bg-[rgb(var(--accent))]"></div>
-          <h2 class="text-xs uppercase tracking-[0.28em] text-white/60" data-i18n="oddities">Bizarre stuff for sale</h2>
+          <h2 class="k-label" data-i18n="oddities">Bizarre stuff for sale</h2>
           <div class="h-px flex-1 bg-white/10"></div>
         </div>
       </div>
-
       <div class="flex flex-col gap-4">
-        {featured.oddities.map((p) => (
-          <PostCard post={p} />
-        ))}
+        {featured.oddities.map((p) => (<PostCard post={p} />))}
       </div>
-
       <div class="mt-10 px-6 text-[11px] text-white/35 text-center">
         <span data-i18n="generated">Generated</span>: {new Date(featured.generatedAt || Date.now()).toISOString()}
       </div>

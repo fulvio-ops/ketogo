@@ -1,31 +1,26 @@
 ---
-const { post } = Astro.props;
-
+const { post, emphasis = false } = Astro.props;
 const title = post?.title ?? "";
 const url = post?.url ?? post?.permalink ?? "#";
 const subreddit = post?.subreddit ?? "";
 const created = post?.createdUtc ? new Date(post.createdUtc).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : "";
-const judgmentEn = post?.judgment?.en ?? "";
-const judgmentIt = post?.judgment?.it ?? "";
+const jEn = post?.judgment?.en ?? "";
+const jIt = post?.judgment?.it ?? "";
 ---
-
 <a href={url} target="_blank" rel="noopener noreferrer"
-   class="group block mx-4 rounded-3xl k-glass k-border overflow-hidden transition-transform duration-200 active:scale-[0.99] hover:-translate-y-0.5">
+   class={`group block mx-4 rounded-3xl overflow-hidden transition-transform duration-200 active:scale-[0.99] hover:-translate-y-0.5 ${emphasis ? "k-glass k-border" : "k-glass"}`}>
   {post?.thumbnail ? (
-    <div class="aspect-[16/9] overflow-hidden">
+    <div class={`overflow-hidden ${emphasis ? "aspect-[16/10]" : "aspect-[16/9]"}`}>
       <img src={post.thumbnail} alt={title} class="h-full w-full object-cover opacity-90 group-hover:opacity-100 transition" loading="lazy" />
     </div>
   ) : null}
-
-  <div class="px-5 py-5">
-    <div class="text-[10px] uppercase tracking-[0.22em] text-white/45">r/{subreddit}</div>
-    <h3 class="mt-2 text-base leading-snug">{title}</h3>
-
-    <p class="mt-3 text-sm text-white/80">
-      <span data-judgment-en>{judgmentEn}</span>
-      <span data-judgment-it class="hidden">{judgmentIt}</span>
-    </p>
-
-    <div class="mt-4 text-[11px] text-white/40">· reddit · {created}</div>
+  <div class={`px-5 ${emphasis ? "py-6" : "py-5"}`}>
+    <div class="k-label">r/{subreddit}</div>
+    <div class={`mt-2 ${emphasis ? "text-lg" : "text-base"} leading-snug k-title`}>{title}</div>
+    <div class={`mt-3 ${emphasis ? "text-base" : "text-sm"} k-judgment`}>
+      <span data-en>{jEn}</span>
+      <span data-it class="hidden">{jIt}</span>
+    </div>
+    <div class="mt-4 k-meta">· reddit · {created}</div>
   </div>
 </a>
