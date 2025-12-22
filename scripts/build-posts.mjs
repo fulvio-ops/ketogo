@@ -4,8 +4,6 @@ import { XMLParser } from "fast-xml-parser";
 import { approve } from "./editorial.mjs";
 
 const SITE = {
-  title: "KETOGO",
-  subtitle: "Weekly visual selection",
   subreddits: [
     "Damnthatsinteresting",
     "oddlysatisfying",
@@ -15,7 +13,7 @@ const SITE = {
     "gadgets",
     "BuyItForLife"
   ],
-  limit: 30,
+  limit: 40,
   maxAgeDays: 14
 };
 
@@ -27,7 +25,6 @@ function daysAgo(d) {
   return ms / (1000 * 60 * 60 * 24);
 }
 function clean(str) { return (str || "").toString().trim(); }
-
 function uniqBy(arr, keyFn) {
   const seen = new Set();
   const out = [];
@@ -48,7 +45,7 @@ async function fetchRss(url) {
 }
 
 async function getFromRedditJson(sub) {
-  const url = `https://www.reddit.com/r/${sub}/top.json?t=week&limit=50`;
+  const url = `https://www.reddit.com/r/${sub}/top.json?t=week&limit=60`;
   const res = await fetchJson(url);
   if (!res.ok) throw new Error(`Reddit fetch failed ${sub}: ${res.status}`);
   const data = await res.json();
@@ -61,10 +58,7 @@ async function getFromRedditJson(sub) {
       url: p.url_overridden_by_dest || p.url,
       permalink: `https://www.reddit.com${p.permalink}`,
       subreddit: p.subreddit,
-      author: p.author,
       createdUtc: p.created_utc ? new Date(p.created_utc * 1000).toISOString() : null,
-      score: p.score ?? null,
-      numComments: p.num_comments ?? null,
       thumbnail: (p.thumbnail && p.thumbnail.startsWith("http")) ? p.thumbnail : null,
       domain: p.domain ?? null
     };
@@ -84,7 +78,6 @@ async function getFromRedditRss(sub) {
     const title = clean(e.title);
     const link = clean(e.link?.["@_href"] || e.link);
     const updated = clean(e.updated || e.published);
-    const author = clean(e.author?.name);
     const id = clean(e.id) || link;
 
     const content = clean(e.content?.["#text"] || e.content);
@@ -98,10 +91,7 @@ async function getFromRedditRss(sub) {
       url: outbound || link,
       permalink: link,
       subreddit: sub,
-      author: author || null,
       createdUtc: updated || null,
-      score: null,
-      numComments: null,
       thumbnail: null,
       domain: null
     };
@@ -130,7 +120,7 @@ async function main() {
     } catch (e) {
       console.error(String(e));
     }
-    await new Promise((r) => setTimeout(r, 350));
+    await new Promise((r) => setTimeout(r, 300));
   }
 
   const filtered = all.filter((p) => {
@@ -141,23 +131,15 @@ async function main() {
   });
 
   const deduped = uniqBy(filtered, (p) => p.url || p.permalink || p.id);
-
   const approved = deduped.map(approve).filter(Boolean).slice(0, SITE.limit);
 
-  if (approved.length < 6) {
-    throw new Error(`Editorial threshold not met (approved=${approved.length}).`);
-  }
+  if (approved.length < 8) throw new Error(`Editorial threshold not met (approved=${approved.length}).`);
 
   const out = { generatedAt: new Date().toISOString(), subreddits: SITE.subreddits, posts: approved };
-
   const outDir = path.join(process.cwd(), "src", "data");
   await fs.mkdir(outDir, { recursive: true });
   await fs.writeFile(path.join(outDir, "posts.json"), JSON.stringify(out, null, 2), "utf8");
-
   console.log(`✅ Built posts.json with ${approved.length} approved items`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main().catch((e) => { console.error(e); process.exit(1); });
