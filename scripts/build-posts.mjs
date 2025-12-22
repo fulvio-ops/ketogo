@@ -1,105 +1,166 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { XMLParser } from "fast-xml-parser";
+
+// Inline config (avoids TS import issues)
 const SITE = {
   title: "KETOGO",
   subtitle: "Weekly visual selection",
-  subreddits: ["Damnthatsinteresting", "oddlysatisfying", "InternetIsBeautiful", "DesignPorn"],
-  limit: 22,
+  subreddits: [
+    "Damnthatsinteresting",
+    "oddlysatisfying",
+    "InternetIsBeautiful",
+    "DesignPorn",
+    "ShutUpAndTakeMyMoney",
+    "gadgets",
+    "BuyItForLife"
+  ],
+  limit: 30,
   maxAgeDays: 14
 };
 
-const UA = process.env.REDDIT_UA || "ketogo/1.0 (static build)";
-const now = Date.now();
-const maxAgeSec = SITE.maxAgeDays * 24 * 3600;
+const UA = process.env.REDDIT_UA || "ketogo/1.0 (github-pages-build)";
+const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
 
-async function fetchListing(sub) {
-  const url = `https://www.reddit.com/r/${sub}/hot.json?limit=40`;
-  const res = await fetch(url, { headers: { "User-Agent": UA } });
+function daysAgo(d) {
+  const ms = Date.now() - d.getTime();
+  return ms / (1000 * 60 * 60 * 24);
+}
+
+function clean(str) {
+  return (str || "").toString().trim();
+}
+
+function uniqBy(arr, keyFn) {
+  const seen = new Set();
+  const out = [];
+  for (const x of arr) {
+    const k = keyFn(x);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(x);
+  }
+  return out;
+}
+
+async function fetchJson(url) {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": UA,
+      "Accept": "application/json,text/plain,*/*"
+    }
+  });
+  return res;
+}
+
+async function fetchRss(url) {
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": UA,
+      "Accept": "application/rss+xml,application/xml,text/xml,*/*"
+    }
+  });
+  return res;
+}
+
+async function getFromRedditJson(sub) {
+  const url = `https://www.reddit.com/r/${sub}/top.json?t=week&limit=50`;
+  const res = await fetchJson(url);
   if (!res.ok) throw new Error(`Reddit fetch failed ${sub}: ${res.status}`);
-  return res.json();
-}
-
-function pickThumb(data) {
-  const p = data?.preview?.images?.[0]?.resolutions;
-  if (Array.isArray(p) && p.length) {
-    const mid = p[Math.min(3, p.length - 1)];
-    return mid?.url?.replaceAll("&amp;", "&");
-  }
-  const t = data?.thumbnail;
-  if (typeof t === "string" && t.startsWith("http")) return t;
-  return undefined;
-}
-
-function toPost(child) {
-  const d = child?.data;
-  if (!d?.id || !d?.title || !d?.permalink) return null;
-
-  // filtri base
-  if (d.stickied) return null;
-  if (d.over_18) return null;
-
-  // età massima
-  if (typeof d.created_utc === "number") {
-    const age = now / 1000 - d.created_utc;
-    if (age > maxAgeSec) return null;
-  }
-
-  const url = typeof d.url === "string" ? d.url : `https://www.reddit.com${d.permalink}`;
-
-  return {
-    id: d.id,
-    title: d.title,
-    url,
-    permalink: `https://www.reddit.com${d.permalink}`,
-    subreddit: d.subreddit || "reddit",
-    author: d.author || "unknown",
-    createdUtc: d.created_utc || 0,
-    score: d.score || 0,
-    comments: d.num_comments || 0,
-    thumb: pickThumb(d),
-    isVideo: Boolean(d.is_video),
-    domain: d.domain
-  };
-}
-
-function dedupeById(posts) {
-  const m = new Map();
-  for (const p of posts) if (!m.has(p.id)) m.set(p.id, p);
-  return [...m.values()];
-}
-
-function sortForMagazine(posts) {
-  // “Editor” senza testo tuo: immagine > engagement > freschezza
-  return posts.sort((a, b) => {
-    const aImg = a.thumb ? 1 : 0;
-    const bImg = b.thumb ? 1 : 0;
-    if (aImg !== bImg) return bImg - aImg;
-
-    const aEng = (a.score || 0) + (a.comments || 0) * 2;
-    const bEng = (b.score || 0) + (b.comments || 0) * 2;
-    if (aEng !== bEng) return bEng - aEng;
-
-    return (b.createdUtc || 0) - (a.createdUtc || 0);
+  const data = await res.json();
+  const children = data?.data?.children || [];
+  return children.map((c) => {
+    const p = c.data;
+    return {
+      id: p.id,
+      title: p.title,
+      url: p.url_overridden_by_dest || p.url,
+      permalink: `https://www.reddit.com${p.permalink}`,
+      subreddit: p.subreddit,
+      author: p.author,
+      createdUtc: p.created_utc ? new Date(p.created_utc * 1000).toISOString() : null,
+      score: p.score ?? null,
+      numComments: p.num_comments ?? null,
+      thumbnail: (p.thumbnail && p.thumbnail.startsWith("http")) ? p.thumbnail : null,
+      domain: p.domain ?? null
+    };
   });
 }
 
-async function main() {
-  const results = [];
+async function getFromRedditRss(sub) {
+  // RSS is often less restricted than JSON endpoints
+  const url = `https://www.reddit.com/r/${sub}/top/.rss?t=week`;
+  const res = await fetchRss(url);
+  if (!res.ok) throw new Error(`Reddit RSS failed ${sub}: ${res.status}`);
+  const xml = await res.text();
+  const data = parser.parse(xml);
+  const entries = data?.feed?.entry || [];
+  const arr = Array.isArray(entries) ? entries : [entries];
 
+  return arr.map((e) => {
+    const title = clean(e.title);
+    const link = clean(e.link?.["@_href"] || e.link);
+    const updated = clean(e.updated || e.published);
+    const author = clean(e.author?.name);
+    const id = clean(e.id) || link;
+
+    // RSS link points to reddit comments, try to extract outbound link if present in content
+    const content = clean(e.content?.["#text"] || e.content);
+    let outbound = null;
+    const m = content.match(/href="(https?:\/\/[^"]+)"/i);
+    if (m && m[1]) outbound = m[1];
+
+    return {
+      id,
+      title,
+      url: outbound || link,
+      permalink: link,
+      subreddit: sub,
+      author: author || null,
+      createdUtc: updated || null,
+      score: null,
+      numComments: null,
+      thumbnail: null,
+      domain: null
+    };
+  });
+}
+
+async function fetchSubreddit(sub) {
+  try {
+    return await getFromRedditJson(sub);
+  } catch (e) {
+    // If JSON is blocked (403), try RSS
+    const msg = String(e);
+    if (msg.includes(": 403") || msg.includes(" 403")) {
+      console.error(`⚠️ JSON blocked for ${sub} (403). Trying RSS...`);
+      return await getFromRedditRss(sub);
+    }
+    throw e;
+  }
+}
+
+async function main() {
+  const all = [];
   for (const sub of SITE.subreddits) {
     try {
-      const json = await fetchListing(sub);
-      const children = json?.data?.children || [];
-      for (const c of children) {
-        const p = toPost(c);
-        if (p) results.push(p);
-      }
+      const items = await fetchSubreddit(sub);
+      all.push(...items);
     } catch (e) {
       console.error(String(e));
     }
+    await new Promise((r) => setTimeout(r, 350));
   }
 
-  const posts = sortForMagazine(dedupeById(results)).slice(0, SITE.limit);
+  // filter recency if we have dates
+  const filtered = all.filter((p) => {
+    if (!p.createdUtc) return true;
+    const d = new Date(p.createdUtc);
+    if (Number.isNaN(d.getTime())) return true;
+    return daysAgo(d) <= SITE.maxAgeDays;
+  });
+
+  const posts = uniqBy(filtered, (p) => p.url || p.permalink || p.id).slice(0, SITE.limit);
 
   const out = {
     generatedAt: new Date().toISOString(),
