@@ -1,8 +1,5 @@
-// /scripts/editorial.mjs
-// “Anima editoriale”: classificazione + filtro + micro-giudizio + punteggio
-// Usa /src/soul/vocabulary.json come fonte immutabile di frasi APPROVATE.
-
-import vocab from "../src/soul/vocabulary.json" assert { type: "json" };
+// scripts/editorial.mjs
+import vocab from "../src/soul/vocabulary.json" with { type: "json" };
 
 export const CATEGORIES = [
   "NATURE",
@@ -13,8 +10,7 @@ export const CATEGORIES = [
   "INEVITABILITY",
 ];
 
-// Fallback minimale se vocabulary.json non avesse abbastanza frasi per categoria
-const fallbackByCat = {
+const vocabByCat = {
   NATURE: ["Nature remains undefeated.", "Probably fine."],
   HUMAN_BEHAVIOR: ["Humanity is trying.", "Someone approved this.", "And yet, here we are."],
   TECH_PROGRESS: ["Progress update.", "No one asked for this.", "This felt like a good idea at the time."],
@@ -23,51 +19,9 @@ const fallbackByCat = {
   INEVITABILITY: ["And yet, here we are.", "This will not be the last time."],
 };
 
-// ---------- Utility deterministica (così non ripete sempre la stessa frase) ----------
-function hashStringToUint32(str) {
-  // FNV-1a
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    h ^= str.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-function mulberry32(a) {
-  return function () {
-    let t = (a += 0x6d2b79f5);
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function pickDeterministic(list, key) {
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const rng = mulberry32(hashStringToUint32(String(key)));
-  const idx = Math.floor(rng() * list.length);
-  return list[idx];
-}
+const allowedMap = new Map((vocab?.allowed || []).map((o) => [o.en, o]));
 
-// ---------- Vocabolario: indicizzazione tollerante ----------
-const allowed = Array.isArray(vocab?.allowed) ? vocab.allowed : [];
-
-// allowedMap: key=en → entry
-const allowedMap = new Map(
-  allowed
-    .filter((o) => o && typeof o.en === "string" && typeof o.it === "string")
-    .map((o) => [o.en, o])
-);
-
-// Raggruppa per categoria se presente (opzionale)
-const allowedByCategory = new Map();
-for (const entry of allowedMap.values()) {
-  const cat = entry.category;
-  if (!cat || typeof cat !== "string") continue;
-  if (!allowedByCategory.has(cat)) allowedByCategory.set(cat, []);
-  allowedByCategory.get(cat).push(entry);
-}
-
-// ---------- Classificazione ----------
+// --- Classificazione (euristiche veloci) ---
 export function classify(post) {
   const title = (post?.title || "").toLowerCase();
   const subreddit = (post?.subreddit || "").toLowerCase();
@@ -75,100 +29,97 @@ export function classify(post) {
   const url = (post?.url || "").toLowerCase();
   const has = (...w) => w.some((x) => title.includes(x));
 
-  // “OBJECT” se sembra commerce o viene dai sub gadget
+  // "Shop" domains -> oggetto
   if (["amazon.", "amzn.", "etsy.", "ebay.", "aliexpress.", "temu.", "shopify."].some((x) => domain.includes(x) || url.includes(x))) {
     return "OBJECT";
   }
+
+  // Sub "shop/gadget" -> oggetto
   if (["shutupandtakemymoney", "gadgets", "buyitforlife"].includes(subreddit)) return "OBJECT";
 
-  // NATURE
-  if (has("seal", "seals", "whale", "shark", "crocodile", "octopus", "penguin", "cat", "dog", "bird", "spider", "snake", "eagle", "bear", "wolf")) {
-    return "NATURE";
-  }
+  // Natura
+  if (has("seal", "seals", "whale", "shark", "crocodile", "octopus", "penguin", "cat", "dog", "bird", "spider", "snake", "eagle")) return "NATURE";
 
-  // TECH
-  if (has("ai", "robot", "research", "scientists", "prototype", "device", "engineers", "vr", "ar", "battery", "nasa", "space", "quantum", "chip", "lab")) {
-    return "TECH_PROGRESS";
-  }
+  // Tech
+  if (has("ai", "robot", "research", "scientists", "prototype", "device", "engineers", "vr", "ar", "battery", "nasa", "space", "quantum")) return "TECH_PROGRESS";
 
-  // SYSTEM FAILURE
-  if (has("leak", "breach", "outage", "failure", "crash", "broken", "malfunction", "recall", "bug", "downtime")) {
-    return "SYSTEM_FAILURE";
-  }
+  // Failure / incidenti tecnici
+  if (has("leak", "breach", "outage", "failure", "crash", "broken", "malfunction", "recall")) return "SYSTEM_FAILURE";
 
-  // INEVITABILITY (argomenti “pesanti” geopolitici ecc.) — spesso li scarteremo dopo
-  if (has("war", "invasion", "genocide", "massacre", "hostage", "terror", "bombing")) return "INEVITABILITY";
+  // “Inevitabilità” (tema cupo/geopolitico) — poi comunque filtriamo pesante sotto
+  if (has("war", "invasion", "genocide", "massacre", "hostage", "terror")) return "INEVITABILITY";
 
   return "HUMAN_BEHAVIOR";
 }
 
-// ---------- Filtro “troppo pesante” ----------
+// --- Sicurezza editoriale: taglia il “troppo pesante” ---
 export function isTooHeavy(post) {
   const t = (post?.title || "").toLowerCase();
   const heavy = [
-    "murder","killed","dead","death","suicide","rape","terror","hostage","war",
-    "genocide","massacre","shooting","bomb","torture","beheaded","child abuse","assault"
+    "murder", "killed", "dead", "death", "suicide",
+    "rape", "terror", "hostage", "war", "genocide",
+    "massacre", "shooting", "bomb", "torture", "beheaded",
   ];
   return heavy.some((w) => t.includes(w));
 }
 
-// ---------- Micro-giudizio: prende da vocabulary.json (se c’è), altrimenti fallback ----------
-function chooseJudgment(category, post, seed = "default") {
-  // 1) prova frasi “allowed” per categoria (se presenti nel json)
-  const pool = allowedByCategory.get(category);
-  if (Array.isArray(pool) && pool.length) {
-    // scelta deterministica per settimana/post (così varia ma non “balla” a ogni build)
-    const chosen = pickDeterministic(pool, `${seed}:${post?.id || post?.url || post?.title || "x"}`);
-    if (chosen) return chosen; // {en,it,...}
-  }
-
-  // 2) fallback: usa le stringhe hardcoded e cerca la coppia en/it nel json, se esiste
-  const fb = fallbackByCat[category] || [];
-  const en = pickDeterministic(fb, `${seed}:${category}:${post?.id || post?.url || post?.title || "x"}`);
-  if (!en) return null;
-
-  // se nel vocabulary esiste la stessa en, usa quella (con it coerente)
-  const fromAllowed = allowedMap.get(en);
-  if (fromAllowed) return fromAllowed;
-
-  // altrimenti crea una coppia base (IT minimale)
-  return { en, it: en };
+function chooseJudgment(category) {
+  const options = vocabByCat[category] || [];
+  const sorted = [...options].sort((a, b) => a.length - b.length || a.localeCompare(b));
+  const en = sorted[0];
+  const pair = allowedMap.get(en);
+  return pair || null; // {en,it}
 }
 
-// ---------- Approva: qui avviene il “controllo editore” ----------
-export function approve(post, seed = "default") {
+// --- “Approvazione” editoriale: decide se pubblichiamo e aggiunge giudizio ---
+export function approve(post) {
   if (!post?.title || !post?.url) return null;
   if (isTooHeavy(post)) return null;
 
   const category = classify(post);
   if (!CATEGORIES.includes(category)) return null;
 
-  const judgment = chooseJudgment(category, post, seed);
-  if (!judgment || !judgment.en || !judgment.it) return null;
+  const judgment = chooseJudgment(category);
+  if (!judgment) return null;
 
   return { ...post, category, judgment };
 }
 
-// ---------- Score (shareability) ----------
+// --- Punteggio di condivisibilità (semplice, stabile, orientato a “compagnia”) ---
 export function score(post) {
   let s = 0;
 
-  // segnali di “cliccabilità”
-  if (post.thumbnail) s += 3;
-  if (post.judgment?.en) s += 3;
+  // presenza immagine/preview
+  if (post?.thumbnail) s += 3;
+  if (post?.image) s += 2;
 
-  // categorie che performano bene nel tuo modello “compagnia + share”
-  if (post.category === "OBJECT") s += 2;
-  if (post.category === "NATURE") s += 2;
-  if (post.category === "TECH_PROGRESS") s += 1;
+  // micro-giudizio = firma editoriale
+  if (post?.judgment?.en) s += 3;
+
+  // categorie che tendono a “girare” meglio
+  if (post?.category === "OBJECT") s += 1;
+  if (post?.category === "NATURE") s += 1;
+
+  const t = (post?.title || "").toLowerCase();
+
+  // penalità per gore/violenza (anche se “non heavy”)
+  if (["blood", "corpse", "assault", "mutilation"].some((w) => t.includes(w))) s -= 3;
 
   // titolo troppo lungo = meno share
-  if ((post.title || "").length < 90) s += 1;
-
-  // penalità “gore/violenza” anche se non è scattato il filtro heavy
-  const t = (post.title || "").toLowerCase();
-  if (["blood", "corpse", "assault", "mutilation"].some((w) => t.includes(w))) s -= 5;
+  if ((post?.title || "").length < 90) s += 1;
 
   return s;
 }
 
+// --- Livello (1..5) per bilanciare il mix “piatto/non piatto” ---
+// Nota: NON è “disturbante/colto/ironico” in astratto: è un proxy operativo
+// che aiuta a comporre una selezione più viva (in base al punteggio share).
+export function levelOf(post) {
+  const s = score(post);
+
+  if (s >= 8) return 5;
+  if (s >= 6) return 4;
+  if (s >= 4) return 3;
+  if (s >= 2) return 2;
+  return 1;
+}
