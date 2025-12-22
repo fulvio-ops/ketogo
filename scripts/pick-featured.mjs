@@ -3,6 +3,7 @@ import path from "node:path";
 import { score } from "./editorial.mjs";
 import vocab from "../src/soul/vocabulary.json" assert { type: "json" };
 import { validateFeatured } from "./editorial-gate.mjs";
+import { filterGadgets } from "./gadget-gate.mjs";
 
 const SOURCE = "src/data/posts.json";
 const OUT = "src/data/featured.json";
