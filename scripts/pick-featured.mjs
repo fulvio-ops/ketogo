@@ -1,4 +1,3 @@
-// scripts/pick-featured.mjs
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,13 +8,21 @@ import { filterGadgets } from "./gadget-gate.mjs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Quanti elementi per sezione (4+4)
 const PICK = 4;
 
-// Sub considerati “shop/gadget” (tutto lowercase, confronto case-insensitive)
+// Sub considered shop/gadget (lowercase; case-insensitive compare)
 const SHOP_SUBS = new Set(["shutupandtakemymoney", "gadgets", "buyitforlife"]);
 
-const subOf = (p) => String(p?.subreddit || "").toLowerCase();
+function subOf(p) {
+  const s = String(p?.subreddit || p?.subreddit_name_prefixed || "").toLowerCase();
+  return s.startsWith("r/") ? s.slice(2) : s;
+}
+
+function looksCommerce(p) {
+  const d = String(p?.domain || "").toLowerCase();
+  const u = String(p?.url || "").toLowerCase();
+  return ["amazon.", "amzn.", "etsy.", "ebay.", "aliexpress.", "temu.", "shopify."].some((x) => d.includes(x) || u.includes(x));
+}
 
 function mulberry32(a) {
   return function () {
@@ -27,9 +34,8 @@ function mulberry32(a) {
 }
 
 function isoWeekSeed(d = new Date()) {
-  // Seed stabile settimanale (ISO week) -> stesso featured per tutta la settimana
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7)); // giovedì decide l'anno ISO
+  date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   const weekNo = Math.ceil(((date - yearStart) / 86400000 + 1) / 7);
   const isoYear = date.getUTCFullYear();
@@ -38,7 +44,6 @@ function isoWeekSeed(d = new Date()) {
 
 function pickN(arr, n, rng) {
   const a = [...arr];
-  // shuffle deterministico
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
@@ -60,27 +65,7 @@ async function writeJson(p, obj) {
   await fs.writeFile(p, JSON.stringify(obj, null, 2), "utf8");
 }
 
-// Level robusto: usa campi presenti se esistono, altrimenti deriva dal punteggio
-function levelOf(p) {
-  const direct =
-    Number(p?.level) ||
-    Number(p?.editorial?.level) ||
-    Number(p?.editorialLevel) ||
-    Number(p?.meta?.level);
-
-  if (Number.isFinite(direct) && direct > 0) return direct;
-
-  // Fallback: mappa score -> level (tieni semplice e stabile)
-  const s = Number(score(p) || 0);
-  if (s >= 7) return 5;
-  if (s >= 5) return 4;
-  if (s >= 3) return 3;
-  if (s >= 1) return 2;
-  return 1;
-}
-
 export async function main() {
-  // dove stanno i file nel repo
   const dataDir = path.join(__dirname, "..", "src", "data");
   const postsPath = path.join(dataDir, "posts.json");
   const featuredPath = path.join(dataDir, "featured.json");
@@ -91,62 +76,51 @@ export async function main() {
   const seed = isoWeekSeed();
   const rng = mulberry32(seed);
 
-  // HERO = quello col punteggio più alto
   const hero =
     [...posts].sort((a, b) => score(b) - score(a) || String(a.title).localeCompare(String(b.title)))[0] || null;
 
-  // Pool articoli vs pool shop (case-insensitive)
   const articlesPool = posts.filter(
-    (p) => p?.subreddit && !SHOP_SUBS.has(subOf(p)) && (!hero || p.id !== hero.id)
-  );
-  const odditiesPool = posts.filter(
-    (p) => p?.subreddit && SHOP_SUBS.has(subOf(p)) && (!hero || p.id !== hero.id)
+    (p) =>
+      (p?.subreddit || p?.subreddit_name_prefixed) &&
+      !SHOP_SUBS.has(subOf(p)) &&
+      !looksCommerce(p) &&
+      (!hero || p.id !== hero.id)
   );
 
-  // 4 articoli random da pool
+  const odditiesPool = posts
+    .filter(
+      (p) =>
+        ((p?.subreddit || p?.subreddit_name_prefixed) && SHOP_SUBS.has(subOf(p))) || looksCommerce(p)
+    )
+    .filter((p) => (!hero || p.id !== hero.id));
+
   const articles = pickN(articlesPool, PICK, rng);
 
-  // 4 gadget random, ma filtrati con la gate prezzo (5–15 ideale, max 25)
+  // Apply gadget gate; if it yields 0 due to missing prices, fall back to raw odditiesPool
   const gatedOddities = filterGadgets(odditiesPool);
-  const pickedOdd = pickN(gatedOddities, PICK, rng);
+  const baseOddities = gatedOddities.length ? gatedOddities : odditiesPool;
 
-  // Se i gadget filtrati non bastano, riempi con altri post “shop”
-  const need = PICK - pickedOdd.length;
-  const fill =
-    need > 0
-      ? pickN(
-          odditiesPool.filter((p) => !pickedOdd.some((o) => o.id === p.id)),
-          need,
-          rng
-        )
-      : [];
+  const oddities = pickN(baseOddities, PICK, rng);
 
   const featured = {
     generatedAt: new Date().toISOString(),
     seed,
     hero,
     articles,
-    oddities: [...pickedOdd, ...fill],
-  };
-
-  // Bilanciamento editoriale: se possibile, almeno 1 elemento “level>=4” in vetrina
-  const current = [featured.hero, ...featured.articles, ...featured.oddities].filter(Boolean);
-  const l4 = current.filter((p) => levelOf(p) >= 4).length;
-
-  if (l4 < 1) {
-    const candidate = posts
-      .filter((p) => !current.some((x) => x.id === p.id))
-      .filter((p) => levelOf(p) >= 4)[0];
-
-    if (candidate) {
-      // sostituisco l'ultimo oddity (meno invasivo)
-      featured.oddities = [...featured.oddities.slice(0, Math.max(0, featured.oddities.length - 1)), candidate];
+    oddities,
+    debug: {
+      posts: posts.length,
+      articlesPool: articlesPool.length,
+      odditiesPool: odditiesPool.length,
+      gatedOddities: gatedOddities.length
     }
-  }
+  };
 
   await writeJson(featuredPath, featured);
 
-  console.log(`featured.json generated: ${featured.articles.length}+${featured.oddities.length}`);
+  console.log(
+    `featured.json generated: articles=${featured.articles.length}, oddities=${featured.oddities.length} (oddities pool=${odditiesPool.length}, gated=${gatedOddities.length})`
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

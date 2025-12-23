@@ -5,16 +5,10 @@
       "max": 15
     },
     "exception_max": 25,
-    "exception_ratio": 0.25
+    "exception_ratio": 0.25,
+    "unknown_price_ratio": 0.5
   },
   "shareability": {
-    "min_score": 7,
-    "factors": [
-      "immediate_visual",
-      "social_identity",
-      "low_risk",
-      "storytelling",
-      "controlled_absurdity"
-    ]
+    "min_score": 7
   }
 }
