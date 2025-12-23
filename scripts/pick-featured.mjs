@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { score, levelOf } from "./editorial.mjs";
+import { score } from "./editorial.mjs";
 import { filterGadgets } from "./gadget-gate.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,8 +12,10 @@ const __dirname = path.dirname(__filename);
 // Quanti elementi per sezione (4+4)
 const PICK = 4;
 
-// Sub considerati “shop/gadget”
-const SHOP_SUBS = new Set(["ShutUpAndTakeMyMoney", "gadgets", "BuyItForLife"]);
+// Sub considerati “shop/gadget” (tutto lowercase, confronto case-insensitive)
+const SHOP_SUBS = new Set(["shutupandtakemymoney", "gadgets", "buyitforlife"]);
+
+const subOf = (p) => String(p?.subreddit || "").toLowerCase();
 
 function mulberry32(a) {
   return function () {
@@ -58,8 +60,27 @@ async function writeJson(p, obj) {
   await fs.writeFile(p, JSON.stringify(obj, null, 2), "utf8");
 }
 
+// Level robusto: usa campi presenti se esistono, altrimenti deriva dal punteggio
+function levelOf(p) {
+  const direct =
+    Number(p?.level) ||
+    Number(p?.editorial?.level) ||
+    Number(p?.editorialLevel) ||
+    Number(p?.meta?.level);
+
+  if (Number.isFinite(direct) && direct > 0) return direct;
+
+  // Fallback: mappa score -> level (tieni semplice e stabile)
+  const s = Number(score(p) || 0);
+  if (s >= 7) return 5;
+  if (s >= 5) return 4;
+  if (s >= 3) return 3;
+  if (s >= 1) return 2;
+  return 1;
+}
+
 export async function main() {
-  // dove stanno i file nel repo (questa è la struttura standard che stai usando)
+  // dove stanno i file nel repo
   const dataDir = path.join(__dirname, "..", "src", "data");
   const postsPath = path.join(dataDir, "posts.json");
   const featuredPath = path.join(dataDir, "featured.json");
@@ -74,12 +95,12 @@ export async function main() {
   const hero =
     [...posts].sort((a, b) => score(b) - score(a) || String(a.title).localeCompare(String(b.title)))[0] || null;
 
-  // Pool articoli vs pool shop
+  // Pool articoli vs pool shop (case-insensitive)
   const articlesPool = posts.filter(
-    (p) => p?.subreddit && !SHOP_SUBS.has(p.subreddit) && (!hero || p.id !== hero.id)
+    (p) => p?.subreddit && !SHOP_SUBS.has(subOf(p)) && (!hero || p.id !== hero.id)
   );
   const odditiesPool = posts.filter(
-    (p) => p?.subreddit && SHOP_SUBS.has(p.subreddit) && (!hero || p.id !== hero.id)
+    (p) => p?.subreddit && SHOP_SUBS.has(subOf(p)) && (!hero || p.id !== hero.id)
   );
 
   // 4 articoli random da pool
@@ -89,10 +110,16 @@ export async function main() {
   const gatedOddities = filterGadgets(odditiesPool);
   const pickedOdd = pickN(gatedOddities, PICK, rng);
 
-  // Se i gadget filtrati non bastano, riempi con altri post “shop” (sempre escluso hero),
-  // ma SOLO se sono già dentro il pool shop (così non mischi articoli)
+  // Se i gadget filtrati non bastano, riempi con altri post “shop”
   const need = PICK - pickedOdd.length;
-  const fill = need > 0 ? pickN(odditiesPool.filter((p) => !pickedOdd.some((o) => o.id === p.id)), need, rng) : [];
+  const fill =
+    need > 0
+      ? pickN(
+          odditiesPool.filter((p) => !pickedOdd.some((o) => o.id === p.id)),
+          need,
+          rng
+        )
+      : [];
 
   const featured = {
     generatedAt: new Date().toISOString(),
