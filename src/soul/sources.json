@@ -1,0 +1,27 @@
+{
+  "reddit": {
+    "subreddits": [
+      "ShutUpAndTakeMyMoney",
+      "gadgets",
+      "BuyItForLife"
+    ],
+    "limit_per_sub": 40
+  },
+  "rss_fallback": {
+    "enabled": true,
+    "feeds": [
+      {
+        "name": "ShutUpAndTakeMyMoney",
+        "url": "https://www.reddit.com/r/ShutUpAndTakeMyMoney/.rss"
+      },
+      {
+        "name": "gadgets",
+        "url": "https://www.reddit.com/r/gadgets/.rss"
+      },
+      {
+        "name": "BuyItForLife",
+        "url": "https://www.reddit.com/r/BuyItForLife/.rss"
+      }
+    ]
+  }
+}

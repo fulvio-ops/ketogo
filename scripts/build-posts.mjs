@@ -1,145 +1,132 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { XMLParser } from "fast-xml-parser";
-import { approve } from "./editorial.mjs";
+import { fileURLToPath } from "node:url";
+import sources from "../src/soul/sources.json" with { type: "json" };
 
-const SITE = {
-  subreddits: [
-    "Damnthatsinteresting",
-    "oddlysatisfying",
-    "InternetIsBeautiful",
-    "DesignPorn",
-    "ShutUpAndTakeMyMoney",
-    "gadgets",
-    "BuyItForLife"
-  ],
-  limit: 40,
-  maxAgeDays: 14
-};
-
-const UA = process.env.REDDIT_UA || "ketogo/1.0 (github-pages-build)";
-const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
-
-function daysAgo(d) {
-  const ms = Date.now() - d.getTime();
-  return ms / (1000 * 60 * 60 * 24);
+// Minimal RSS fetch + parse (no external deps)
+function strip(s) { return String(s || "").trim(); }
+function decodeHtml(s){
+  return strip(s)
+    .replace(/&amp;/g,"&")
+    .replace(/&lt;/g,"<")
+    .replace(/&gt;/g,">")
+    .replace(/&quot;/g,'"')
+    .replace(/&#39;/g,"'");
 }
-function clean(str) { return (str || "").toString().trim(); }
-function uniqBy(arr, keyFn) {
+
+function pickBetween(hay, a, b){
+  const i = hay.indexOf(a);
+  if (i < 0) return "";
+  const j = hay.indexOf(b, i + a.length);
+  if (j < 0) return "";
+  return hay.slice(i + a.length, j);
+}
+
+function parseRss(xml, subredditName){
+  const items = [];
+  const parts = xml.split("<entry>");
+  for (let k=1;k<parts.length;k++){
+    const entry = parts[k];
+    const title = decodeHtml(pickBetween(entry, "<title>", "</title>"));
+    const linkTag = pickBetween(entry, '<link rel="alternate" type="text/html" href="', '"');
+    const url = linkTag || decodeHtml(pickBetween(entry, "<link>", "</link>"));
+    const id = decodeHtml(pickBetween(entry, "<id>", "</id>")) || url;
+    const updated = decodeHtml(pickBetween(entry, "<updated>", "</updated>"));
+    // Reddit RSS content sometimes contains an <img ... src="...">
+    const content = entry;
+    let thumb = "";
+    const imgSrc = pickBetween(content, 'src="', '"');
+    if (imgSrc && imgSrc.startsWith("http")) thumb = imgSrc;
+
+    if (!title || !url) continue;
+    items.push({
+      id,
+      title,
+      url,
+      subreddit: subredditName,
+      subreddit_name_prefixed: "r/" + subredditName,
+      domain: (() => { try { return new URL(url).hostname; } catch { return ""; } })(),
+      thumbnail: thumb || "",
+      created_utc: updated ? Date.parse(updated)/1000 : undefined
+    });
+  }
+  return items;
+}
+
+async function fetchText(url){
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "ketogo-bot/1.0 (RSS)"
+    }
+  });
+  if (!res.ok) throw new Error(`Fetch failed ${res.status} ${url}`);
+  return await res.text();
+}
+
+async function readJsonSafe(p){
+  try{ return JSON.parse(await fs.readFile(p, "utf8")); } catch { return null; }
+}
+
+function uniqByUrl(arr){
   const seen = new Set();
   const out = [];
-  for (const x of arr) {
-    const k = keyFn(x);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(x);
+  for (const p of arr){
+    const key = p?.url || p?.id;
+    if (!key) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(p);
   }
   return out;
 }
 
-async function fetchJson(url) {
-  return fetch(url, { headers: { "User-Agent": UA, "Accept": "application/json,text/plain,*/*" } });
-}
-async function fetchRss(url) {
-  return fetch(url, { headers: { "User-Agent": UA, "Accept": "application/rss+xml,application/xml,text/xml,*/*" } });
-}
+async function main(){
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
 
-async function getFromRedditJson(sub) {
-  const url = `https://www.reddit.com/r/${sub}/top.json?t=week&limit=60`;
-  const res = await fetchJson(url);
-  if (!res.ok) throw new Error(`Reddit fetch failed ${sub}: ${res.status}`);
-  const data = await res.json();
-  const children = data?.data?.children || [];
-  return children.map((c) => {
-    const p = c.data;
-    return {
-      id: p.id,
-      title: p.title,
-      url: p.url_overridden_by_dest || p.url,
-      permalink: `https://www.reddit.com${p.permalink}`,
-      subreddit: p.subreddit,
-      createdUtc: p.created_utc ? new Date(p.created_utc * 1000).toISOString() : null,
-      thumbnail: (p.thumbnail && p.thumbnail.startsWith("http")) ? p.thumbnail : null,
-      domain: p.domain ?? null
-    };
-  });
-}
+  const dataDir = path.join(__dirname, "..", "src", "data");
+  const outPath = path.join(dataDir, "posts.json");
 
-async function getFromRedditRss(sub) {
-  const url = `https://www.reddit.com/r/${sub}/top/.rss?t=week`;
-  const res = await fetchRss(url);
-  if (!res.ok) throw new Error(`Reddit RSS failed ${sub}: ${res.status}`);
-  const xml = await res.text();
-  const data = parser.parse(xml);
-  const entries = data?.feed?.entry || [];
-  const arr = Array.isArray(entries) ? entries : [entries];
+  const prev = await readJsonSafe(outPath);
+  const prevPosts = Array.isArray(prev?.posts) ? prev.posts : [];
 
-  return arr.map((e) => {
-    const title = clean(e.title);
-    const link = clean(e.link?.["@_href"] || e.link);
-    const updated = clean(e.updated || e.published);
-    const id = clean(e.id) || link;
+  const subs = sources?.reddit?.subreddits || [];
+  const feeds = sources?.rss_fallback?.feeds || [];
 
-    const content = clean(e.content?.["#text"] || e.content);
-    let outbound = null;
-    const m = content.match(/href="(https?:\/\/[^"]+)"/i);
-    if (m && m[1]) outbound = m[1];
+  let posts = [];
+  let used = [];
 
-    return {
-      id,
-      title,
-      url: outbound || link,
-      permalink: link,
-      subreddit: sub,
-      createdUtc: updated || null,
-      thumbnail: null,
-      domain: null
-    };
-  });
-}
-
-async function fetchSubreddit(sub) {
-  try {
-    return await getFromRedditJson(sub);
-  } catch (e) {
-    const msg = String(e);
-    if (msg.includes(": 403") || msg.includes(" 403")) {
-      console.error(`⚠️ JSON blocked for ${sub} (403). Trying RSS...`);
-      return await getFromRedditRss(sub);
+  // RSS fallback (stable and public)
+  for (const f of feeds){
+    try{
+      const xml = await fetchText(f.url);
+      const parsed = parseRss(xml, f.name);
+      posts.push(...parsed);
+      used.push(f.name);
+    } catch (e){
+      console.error("RSS error:", f.url, e?.message || e);
     }
-    throw e;
-  }
-}
-
-async function main() {
-  const all = [];
-  for (const sub of SITE.subreddits) {
-    try {
-      const items = await fetchSubreddit(sub);
-      all.push(...items);
-    } catch (e) {
-      console.error(String(e));
-    }
-    await new Promise((r) => setTimeout(r, 300));
   }
 
-  const filtered = all.filter((p) => {
-    if (!p.createdUtc) return true;
-    const d = new Date(p.createdUtc);
-    if (Number.isNaN(d.getTime())) return true;
-    return daysAgo(d) <= SITE.maxAgeDays;
-  });
+  posts = uniqByUrl(posts);
 
-  const deduped = uniqBy(filtered, (p) => p.url || p.permalink || p.id);
-  const approved = deduped.map(approve).filter(Boolean).slice(0, SITE.limit);
+  // If everything failed, DO NOT overwrite with empty: keep last good file.
+  if (posts.length === 0 && prevPosts.length > 0){
+    console.warn("No new posts fetched; keeping previous posts.json");
+    return;
+  }
 
-  if (approved.length < 8) throw new Error(`Editorial threshold not met (approved=${approved.length}).`);
+  await fs.mkdir(dataDir, { recursive: true });
+  await fs.writeFile(outPath, JSON.stringify({
+    generatedAt: new Date().toISOString(),
+    subreddits: used.length ? used : subs,
+    posts
+  }, null, 2), "utf8");
 
-  const out = { generatedAt: new Date().toISOString(), subreddits: SITE.subreddits, posts: approved };
-  const outDir = path.join(process.cwd(), "src", "data");
-  await fs.mkdir(outDir, { recursive: true });
-  await fs.writeFile(path.join(outDir, "posts.json"), JSON.stringify(out, null, 2), "utf8");
-  console.log(`✅ Built posts.json with ${approved.length} approved items`);
+  console.log(`posts.json written: ${posts.length} posts from ${used.join(", ")}`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
