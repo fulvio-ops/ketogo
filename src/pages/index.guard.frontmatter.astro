@@ -1,0 +1,21 @@
+---
+// Paste THIS at the top of your existing src/pages/index.astro frontmatter.
+// It throws at build-time if featured/posts are missing or empty.
+
+import featured from "../data/featured.json";
+import postsData from "../data/posts.json";
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg);
+}
+
+assert(featured, "featured.json missing (import failed).");
+assert(Array.isArray(featured.articles), "featured.json invalid: articles missing.");
+assert(Array.isArray(featured.oddities), "featured.json invalid: oddities missing.");
+assert((featured.hero && featured.hero.title) || featured.articles.length > 0, "featured.json empty: no hero/articles.");
+
+const subs = Array.isArray(postsData?.subreddits) ? postsData.subreddits : [];
+const SHOP = new Set(["ShutUpAndTakeMyMoney","gadgets","BuyItForLife"]);
+const hasShop = subs.some(s => SHOP.has(String(s)));
+assert(!hasShop || featured.oddities.length > 0, "featured.json empty: oddities missing while shop subs enabled.");
+---

@@ -1,68 +1,45 @@
+// scripts/gadget-gate.mjs
+// Gadget price gate: ideal 5–15 EUR, allow up to 25 EUR.
+// If price is unknown, keep it (soft gate).
+
 import rules from "../src/soul/gadget-rules.json" with { type: "json" };
 
-// Reddit posts almost never contain a numeric price.
-// So we enforce strict price gates when price exists,
-// and allow a limited quota of "unknown price" items (still must be highly shareable).
+const IDEAL_MIN = 5;
+const IDEAL_MAX = 15;
+const HARD_MAX = 25;
 
-function num(x) {
-  const n = Number(x);
-  return Number.isFinite(n) ? n : null;
+function parsePriceEUR(text = "") {
+  const t = String(text);
+  const m =
+    t.match(/(?:€\s*|eur\s*)(\d{1,4})(?:[.,](\d{2}))?/i) ||
+    t.match(/(\d{1,4})(?:[.,](\d{2}))?\s*(?:€|eur)/i);
+  if (!m) return null;
+  const euros = Number(m[1]);
+  const cents = m[2] ? Number(m[2]) : 0;
+  if (!Number.isFinite(euros) || euros <= 0) return null;
+  return euros + cents / 100;
 }
 
-// Minimal, cheap shareability proxy (0..8)
-function scoreShareability(item) {
-  let score = 0;
-
-  // 1) immediate visual
-  if (item.thumbnail || item.image) score += 2;
-
-  // 2) storytelling (short-ish title)
-  const titleLen = (item.title || "").length;
-  if (titleLen > 0 && titleLen < 90) score += 1;
-
-  // 3) social identity / gadgetness
-  if (item.category === "OBJECT") score += 2;
-
-  // 4) low risk
-  if (!item.isHeavy) score += 1;
-
-  // 5) controlled absurdity (if provided upstream)
-  if (item.absurdity === true) score += 2;
-
-  return score;
+export function filterGadgets(posts) {
+  const allowUnknown = rules?.allowUnknownPrice !== false;
+  return (posts || []).filter((p) => {
+    const title = (p?.title || "");
+    const url = (p?.url || "");
+    const domain = (p?.domain || "");
+    const price = parsePriceEUR(title) ?? parsePriceEUR(url) ?? parsePriceEUR(domain);
+    if (price == null) return allowUnknown;
+    if (price > HARD_MAX) return false;
+    return true;
+  });
 }
 
-function priceBand(price) {
-  if (price == null) return "unknown";
-  if (price >= rules.price_rules.core_range.min && price <= rules.price_rules.core_range.max) return "core";
-  if (price <= rules.price_rules.exception_max) return "exception";
-  return "reject";
-}
-
-export function filterGadgets(items) {
-  const core = [];
-  const exception = [];
-  const unknown = [];
-
-  for (const item of items || []) {
-    const p = num(item.price);
-    const band = priceBand(p);
-    if (band === "reject") continue;
-
-    const share = scoreShareability(item);
-    if (share < rules.shareability.min_score) continue;
-
-    item._shareability = share;
-
-    if (band === "core") core.push(item);
-    else if (band === "exception") exception.push(item);
-    else unknown.push(item);
-  }
-
-  const maxExceptions = Math.max(1, Math.floor(core.length * rules.price_rules.exception_ratio));
-  const maxUnknown = Math.max(1, Math.floor((core.length + maxExceptions) * rules.price_rules.unknown_price_ratio));
-
-  return core
-    .concat(exception.slice(0, maxExceptions))
-    .concat(unknown.slice(0, maxUnknown));
+export function gadgetPriceBand(post) {
+  const title = (post?.title || "");
+  const url = (post?.url || "");
+  const domain = (post?.domain || "");
+  const price = parsePriceEUR(title) ?? parsePriceEUR(url) ?? parsePriceEUR(domain);
+  if (price == null) return { price: null, band: "unknown" };
+  if (price >= IDEAL_MIN && price <= IDEAL_MAX) return { price, band: "ideal" };
+  if (price <= HARD_MAX) return { price, band: "ok" };
+  return { price, band: "reject" };
 }

@@ -1,14 +1,3 @@
 {
-  "price_rules": {
-    "core_range": {
-      "min": 5,
-      "max": 15
-    },
-    "exception_max": 25,
-    "exception_ratio": 0.25,
-    "unknown_price_ratio": 0.5
-  },
-  "shareability": {
-    "min_score": 7
-  }
+  "allowUnknownPrice": true
 }

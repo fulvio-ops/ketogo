@@ -1,28 +1,22 @@
+// scripts/pick-featured.mjs
+// Select weekly featured items (hero + 4 articles + 4 oddities).
+// HARD GUARDS:
+// - FAIL if posts.json missing/empty
+// - FAIL if odditiesPool > 0 but selected oddities == 0
+// - Ensure at least one level>=4 item if available
+
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { score } from "./editorial.mjs";
-import { filterGadgets } from "./gadget-gate.mjs";
+import { score, levelOf } from "./editorial.mjs";
+import { filterGadgets, gadgetPriceBand } from "./gadget-gate.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PICK = 4;
-
-// Sub considered shop/gadget (lowercase; case-insensitive compare)
-const SHOP_SUBS = new Set(["shutupandtakemymoney", "gadgets", "buyitforlife"]);
-
-function subOf(p) {
-  const s = String(p?.subreddit || p?.subreddit_name_prefixed || "").toLowerCase();
-  return s.startsWith("r/") ? s.slice(2) : s;
-}
-
-function looksCommerce(p) {
-  const d = String(p?.domain || "").toLowerCase();
-  const u = String(p?.url || "").toLowerCase();
-  return ["amazon.", "amzn.", "etsy.", "ebay.", "aliexpress.", "temu.", "shopify."].some((x) => d.includes(x) || u.includes(x));
-}
+const SHOP_SUBS = new Set(["ShutUpAndTakeMyMoney", "gadgets", "BuyItForLife"]);
 
 function mulberry32(a) {
   return function () {
@@ -65,6 +59,12 @@ async function writeJson(p, obj) {
   await fs.writeFile(p, JSON.stringify(obj, null, 2), "utf8");
 }
 
+function oddityRank(p) {
+  const { band } = gadgetPriceBand(p);
+  const bandScore = band === "ideal" ? 3 : band === "ok" ? 2 : band === "unknown" ? 1 : 0;
+  return bandScore * 100 + score(p);
+}
+
 export async function main() {
   const dataDir = path.join(__dirname, "..", "src", "data");
   const postsPath = path.join(dataDir, "posts.json");
@@ -73,54 +73,59 @@ export async function main() {
   const data = await readJsonSafe(postsPath);
   const posts = Array.isArray(data?.posts) ? data.posts : [];
 
+  if (posts.length === 0) {
+    throw new Error("pick-featured: posts.json is missing or empty; cannot generate featured.json");
+  }
+
   const seed = isoWeekSeed();
   const rng = mulberry32(seed);
 
   const hero =
     [...posts].sort((a, b) => score(b) - score(a) || String(a.title).localeCompare(String(b.title)))[0] || null;
 
-  const articlesPool = posts.filter(
-    (p) =>
-      (p?.subreddit || p?.subreddit_name_prefixed) &&
-      !SHOP_SUBS.has(subOf(p)) &&
-      !looksCommerce(p) &&
-      (!hero || p.id !== hero.id)
-  );
-
-  const odditiesPool = posts
-    .filter(
-      (p) =>
-        ((p?.subreddit || p?.subreddit_name_prefixed) && SHOP_SUBS.has(subOf(p))) || looksCommerce(p)
-    )
-    .filter((p) => (!hero || p.id !== hero.id));
+  const articlesPool = posts.filter((p) => p?.subreddit && !SHOP_SUBS.has(p.subreddit) && (!hero || p.id !== hero.id));
+  const odditiesPool = posts.filter((p) => p?.subreddit && SHOP_SUBS.has(p.subreddit) && (!hero || p.id !== hero.id));
 
   const articles = pickN(articlesPool, PICK, rng);
 
-  // Apply gadget gate; if it yields 0 due to missing prices, fall back to raw odditiesPool
-  const gatedOddities = filterGadgets(odditiesPool);
-  const baseOddities = gatedOddities.length ? gatedOddities : odditiesPool;
+  const gatedOddities = filterGadgets(odditiesPool).sort((a, b) => oddityRank(b) - oddityRank(a));
+  const pickedOdd = pickN(gatedOddities, PICK, rng);
 
-  const oddities = pickN(baseOddities, PICK, rng);
+  if (odditiesPool.length > 0 && pickedOdd.length === 0) {
+    throw new Error(
+      `pick-featured: odditiesPool=${odditiesPool.length} but selected=0. Gadget gate likely too strict or prices not parsable.`
+    );
+  }
+
+  const need = PICK - pickedOdd.length;
+  const fill =
+    need > 0
+      ? pickN(odditiesPool.filter((p) => !pickedOdd.some((o) => o.id === p.id)), need, rng)
+      : [];
 
   const featured = {
     generatedAt: new Date().toISOString(),
     seed,
     hero,
     articles,
-    oddities,
-    debug: {
-      posts: posts.length,
-      articlesPool: articlesPool.length,
-      odditiesPool: odditiesPool.length,
-      gatedOddities: gatedOddities.length
-    }
+    oddities: [...pickedOdd, ...fill],
   };
 
-  await writeJson(featuredPath, featured);
+  const current = [featured.hero, ...featured.articles, ...featured.oddities].filter(Boolean);
+  const l4 = current.filter((p) => levelOf(p) >= 4).length;
 
-  console.log(
-    `featured.json generated: articles=${featured.articles.length}, oddities=${featured.oddities.length} (oddities pool=${odditiesPool.length}, gated=${gatedOddities.length})`
-  );
+  if (l4 < 1) {
+    const candidate = posts
+      .filter((p) => !current.some((x) => x.id === p.id))
+      .filter((p) => levelOf(p) >= 4)[0];
+
+    if (candidate) {
+      featured.oddities = [...featured.oddities.slice(0, Math.max(0, featured.oddities.length - 1)), candidate];
+    }
+  }
+
+  await writeJson(featuredPath, featured);
+  console.log(`✅ featured.json generated: ${featured.articles.length}+${featured.oddities.length}`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
