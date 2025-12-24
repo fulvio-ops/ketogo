@@ -1,9 +1,10 @@
 import { defineConfig } from "astro/config";
-import tailwind from "@astrojs/tailwind";
 
 export default defineConfig({
-  integrations: [tailwind()],
+  // Custom domain: GitHub Pages serve dalla ROOT del dominio
+  site: "https://ketogo.it",
+  base: "/",
+
+  // (opzionale ma consigliato) output statico esplicito
   output: "static",
-  site: process.env.SITE_URL || "https://example.com",
-  base: process.env.BASE_PATH || "/"
 });
